@@ -3,12 +3,15 @@
 from collections.abc import Generator
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 import app.models  # noqa: F401 - registers all models with Base.metadata
 from app.db.base import Base
+from app.db.session import get_db
+from app.main import app as fastapi_app
 
 
 @pytest.fixture(scope="session")
@@ -53,3 +56,20 @@ def db_session(engine: Engine) -> Generator[Session, None, None]:
         session.close()
         transaction.rollback()
         connection.close()
+
+
+@pytest.fixture
+def client(db_session: Session) -> Generator[TestClient, None, None]:
+    """A FastAPI TestClient whose `get_db` dependency is overridden to
+    reuse the same transactional `db_session`, so API tests see (and
+    clean up) the exact same data as a direct-to-ORM test would.
+    """
+
+    def override_get_db() -> Generator[Session, None, None]:
+        yield db_session
+
+    fastapi_app.dependency_overrides[get_db] = override_get_db
+    try:
+        yield TestClient(fastapi_app)
+    finally:
+        fastapi_app.dependency_overrides.clear()

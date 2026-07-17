@@ -6,7 +6,9 @@ imported at least once before they run.
 """
 
 from app.models.academy import Academy
+from app.models.event import Event
+from app.models.match import Match
 from app.models.player import Player
 from app.models.team import Team
 
-__all__ = ["Academy", "Player", "Team"]
+__all__ = ["Academy", "Event", "Match", "Player", "Team"]

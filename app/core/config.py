@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     environment: str = "development"
     api_v1_prefix: str = "/api/v1"
 
+    # Origins allowed to call this API from a browser (the frontend's dev
+    # server and, later, its deployed URL). Comma-separated in the env var.
+    cors_allowed_origins: list[str] = ["http://localhost:3000"]
+
     # Populated once the database is wired up (next feature); kept optional
     # for now so the app can boot without a running Postgres instance.
     database_url: str | None = None

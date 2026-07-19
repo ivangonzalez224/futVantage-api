@@ -19,6 +19,9 @@ Usage:
 
 Uses a fixed random seed (42), so re-running it produces the exact same
 dataset — useful while iterating on dashboards against stable numbers.
+
+-----
+
 """
 
 import random

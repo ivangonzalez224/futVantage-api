@@ -1,4 +1,6 @@
-"""Endpoints for creating matches and reading their team-level report."""
+"""Endpoints for creating matches, listing a team's matches, and reading
+their team-level report.
+"""
 
 from uuid import UUID
 
@@ -53,6 +55,22 @@ def create_match(payload: MatchCreate, db: Session = Depends(get_db)) -> Match:
     db.refresh(match)
 
     return match
+
+
+@router.get("/teams/{team_id}/matches", response_model=list[MatchRead])
+def list_team_matches(team_id: UUID, db: Session = Depends(get_db)) -> list[Match]:
+    """Lists every match recorded for a team, most recent first.
+
+    This is what the frontend's dashboard calls to populate a match
+    picker, instead of requiring the analyst to paste a match UUID by
+    hand.
+    """
+    team = db.get(Team, team_id)
+    if team is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
+
+    statement = select(Match).where(Match.team_id == team_id).order_by(Match.created_at.desc())
+    return list(db.scalars(statement))
 
 
 @router.get("/matches/{match_id}/report", response_model=MatchReportRead)

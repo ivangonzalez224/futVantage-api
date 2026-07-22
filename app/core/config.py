@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     # Populated once the database is wired up (next feature); kept optional
     # for now so the app can boot without a running Postgres instance.
     database_url: str | None = None
+    # Used to sign JWT access tokens. MUST be overridden via the
+    # JWT_SECRET_KEY env var in any environment other than local dev — the
+    # default here is intentionally an obvious placeholder, not a real
+    # secret, so it's never mistaken for one.
+    jwt_secret_key: str = "insecure-dev-only-secret-change-me"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 24  # 24 hours
 
 
 @lru_cache

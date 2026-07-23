@@ -10,10 +10,12 @@ from app.api.routes.matches import router as matches_router
 from app.api.routes.players import router as players_router
 from app.api.routes.teams import router as teams_router
 from app.core.config import get_settings
+from app.core.logging_config import configure_logging
 
 
 def create_app() -> FastAPI:
     """Application factory. Keeps app construction testable and import-safe."""
+    configure_logging()
     settings = get_settings()
 
     app = FastAPI(title=settings.app_name)

@@ -1,4 +1,4 @@
-"""Endpoints for registering, logging in, and reading the current user."""
+"""Endpoints for registering, logging in, and managing the current user."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -9,7 +9,7 @@ from app.api.deps import get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.auth import Token, UserCreate, UserRead
+from app.schemas.auth import ChangePasswordRequest, Token, UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -68,3 +68,55 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 def read_current_user(current_user: User = Depends(get_current_user)) -> User:
     """Returns the profile of whoever the Bearer token belongs to."""
     return current_user
+
+
+@router.patch("/me", response_model=UserRead)
+def update_current_user(
+    payload: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> User:
+    """Updates the logged-in user's profile (`full_name` and/or `email`).
+
+    Only the fields actually sent in the request body are changed —
+    omitting a field leaves it untouched. Changing to an email another
+    account already uses returns 409, same as registration.
+    """
+    if payload.email is not None and payload.email != current_user.email:
+        existing_user = db.scalar(
+            select(User).where(User.email == payload.email, User.id != current_user.id)
+        )
+        if existing_user is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="Email is already registered"
+            )
+        current_user.email = payload.email
+
+    if payload.full_name is not None:
+        current_user.full_name = payload.full_name
+
+    db.commit()
+    db.refresh(current_user)
+
+    return current_user
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """Changes the logged-in user's password.
+
+    Requires the current password to be sent along with the new one —
+    a valid access token alone isn't enough to change the password (e.g.
+    if someone left a session open on a shared computer).
+    """
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Current password is incorrect"
+        )
+
+    current_user.hashed_password = hash_password(payload.new_password)
+    db.commit()

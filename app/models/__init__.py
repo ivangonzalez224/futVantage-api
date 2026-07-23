@@ -8,8 +8,9 @@ imported at least once before they run.
 from app.models.academy import Academy
 from app.models.event import Event
 from app.models.match import Match
+from app.models.password_reset_token import PasswordResetToken
 from app.models.player import Player
 from app.models.team import Team
 from app.models.user import User
 
-__all__ = ["Academy", "Event", "Match", "Player", "Team", "User"]
+__all__ = ["Academy", "Event", "Match", "PasswordResetToken", "Player", "Team", "User"]

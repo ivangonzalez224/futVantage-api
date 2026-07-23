@@ -12,6 +12,7 @@ from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 if TYPE_CHECKING:
     from app.models.academy import Academy
     from app.models.player import Player
+    from app.models.user import User
 
 
 class Team(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -21,8 +22,16 @@ class Team(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(nullable=False)
     category: Mapped[str] = mapped_column(nullable=False)
 
+    # Nullable on purpose: teams seeded before authentication existed have
+    # no owner yet. `PATCH /teams/{id}/claim` lets a logged-in user adopt
+    # one of these "orphan" teams instead of losing that data.
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id"), nullable=True, default=None
+    )
+
     academy: Mapped["Academy"] = relationship(back_populates="teams")
     players: Mapped[list["Player"]] = relationship(back_populates="team")
+    owner: Mapped["User | None"] = relationship()
 
     def __repr__(self) -> str:
         return f"Team(id={self.id!r}, name={self.name!r}, category={self.category!r})"

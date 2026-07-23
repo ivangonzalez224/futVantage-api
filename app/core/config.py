@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "insecure-dev-only-secret-change-me"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24  # 24 hours
+    # Where the frontend lives — used to build the password reset link
+    # that gets emailed to the user (e.g. "{frontend_url}/reset-password?token=...").
+    frontend_url: str = "http://localhost:3000"
+    password_reset_token_expire_minutes: int = 30
 
 
 @lru_cache

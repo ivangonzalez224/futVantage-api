@@ -1,10 +1,14 @@
 """API tests for the authentication endpoints."""
 
+from datetime import UTC, datetime, timedelta
+
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
-from app.models import User
+from app.models import PasswordResetToken, User
 
 
 def test_registers_a_new_user(client: TestClient, db_session: Session) -> None:
@@ -225,3 +229,131 @@ def test_rejects_password_change_without_a_token(client: TestClient, db_session:
     )
 
     assert response.status_code == 401
+
+
+def test_forgot_password_returns_202_for_an_existing_email(
+    client: TestClient, db_session: Session
+) -> None:
+    _register_and_login(client)
+
+    response = client.post("/api/v1/auth/forgot-password", json={"email": "coach@example.com"})
+
+    assert response.status_code == 202
+
+
+def test_forgot_password_returns_202_for_an_unknown_email_too(
+    client: TestClient, db_session: Session
+) -> None:
+    # Same response either way, so a client can't use this endpoint to
+    # probe which emails have accounts.
+    response = client.post("/api/v1/auth/forgot-password", json={"email": "nobody@example.com"})
+
+    assert response.status_code == 202
+
+
+def test_forgot_password_creates_a_usable_reset_token(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _register_and_login(client)
+    captured: dict[str, str] = {}
+
+    def fake_send_email(to_email: str, reset_token: str) -> None:
+        captured["token"] = reset_token
+
+    monkeypatch.setattr("app.api.routes.auth.send_password_reset_email", fake_send_email)
+
+    client.post("/api/v1/auth/forgot-password", json={"email": "coach@example.com"})
+
+    reset_response = client.post(
+        "/api/v1/auth/reset-password",
+        json={"token": captured["token"], "new_password": "brandnewpassword"},
+    )
+    assert reset_response.status_code == 204
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        data={"username": "coach@example.com", "password": "brandnewpassword"},
+    )
+    assert login_response.status_code == 200
+
+
+def test_forgot_password_does_not_send_an_email_for_an_unknown_address(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    send_calls: list[str] = []
+    monkeypatch.setattr(
+        "app.api.routes.auth.send_password_reset_email",
+        lambda to_email, reset_token: send_calls.append(to_email),
+    )
+
+    client.post("/api/v1/auth/forgot-password", json={"email": "nobody@example.com"})
+
+    assert send_calls == []
+
+
+def test_rejects_reset_with_an_invalid_token(client: TestClient, db_session: Session) -> None:
+    response = client.post(
+        "/api/v1/auth/reset-password",
+        json={"token": "not-a-real-token", "new_password": "brandnewpassword"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_rejects_reset_with_an_expired_token(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _register_and_login(client)
+    captured: dict[str, str] = {}
+    monkeypatch.setattr(
+        "app.api.routes.auth.send_password_reset_email",
+        lambda to_email, reset_token: captured.update(token=reset_token),
+    )
+    client.post("/api/v1/auth/forgot-password", json={"email": "coach@example.com"})
+
+    # Force the token that was just issued into the past.
+    reset_token_row = db_session.scalar(select(PasswordResetToken))
+    assert reset_token_row is not None
+    reset_token_row.expires_at = datetime.now(UTC) - timedelta(minutes=1)
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/auth/reset-password",
+        json={"token": captured["token"], "new_password": "brandnewpassword"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_rejects_reusing_a_reset_token(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _register_and_login(client)
+    captured: dict[str, str] = {}
+    monkeypatch.setattr(
+        "app.api.routes.auth.send_password_reset_email",
+        lambda to_email, reset_token: captured.update(token=reset_token),
+    )
+    client.post("/api/v1/auth/forgot-password", json={"email": "coach@example.com"})
+
+    first_use = client.post(
+        "/api/v1/auth/reset-password",
+        json={"token": captured["token"], "new_password": "brandnewpassword"},
+    )
+    assert first_use.status_code == 204
+
+    second_use = client.post(
+        "/api/v1/auth/reset-password",
+        json={"token": captured["token"], "new_password": "anotherpassword"},
+    )
+
+    assert second_use.status_code == 400
+
+
+def test_rejects_a_short_new_password_on_reset(client: TestClient, db_session: Session) -> None:
+    response = client.post(
+        "/api/v1/auth/reset-password",
+        json={"token": "whatever-token", "new_password": "short"},
+    )
+
+    assert response.status_code == 422

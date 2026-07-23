@@ -1,15 +1,34 @@
 """Endpoints for registering, logging in, and managing the current user."""
 
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.config import get_settings
+from app.core.email import send_password_reset_email
+from app.core.security import (
+    create_access_token,
+    generate_password_reset_token,
+    hash_password,
+    hash_reset_token,
+    verify_password,
+)
 from app.db.session import get_db
+from app.models.password_reset_token import PasswordResetToken
 from app.models.user import User
-from app.schemas.auth import ChangePasswordRequest, Token, UserCreate, UserRead, UserUpdate
+from app.schemas.auth import (
+    ChangePasswordRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    Token,
+    UserCreate,
+    UserRead,
+    UserUpdate,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -119,4 +138,74 @@ def change_password(
         )
 
     current_user.hashed_password = hash_password(payload.new_password)
+    db.commit()
+
+
+@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
+def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)) -> None:
+    """Starts a password reset: if the email belongs to an account,
+    emails a one-time reset link.
+
+    Always returns 202 regardless of whether the email exists — a
+    different response for "no account with that email" would let
+    anyone probe which emails are registered.
+    """
+    user = db.scalar(select(User).where(User.email == payload.email))
+    if user is None:
+        return
+
+    settings = get_settings()
+    raw_token = generate_password_reset_token()
+    expires_at = datetime.now(UTC) + timedelta(minutes=settings.password_reset_token_expire_minutes)
+
+    reset_token = PasswordResetToken(
+        user_id=user.id,
+        token_hash=hash_reset_token(raw_token),
+        expires_at=expires_at,
+    )
+    db.add(reset_token)
+    db.commit()
+
+    send_password_reset_email(user.email, raw_token)
+
+
+@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)) -> None:
+    """Completes a password reset using a token from `forgot-password`.
+
+    The token is single-use (rejected once `used_at` is set) and expires
+    after `settings.password_reset_token_expire_minutes`. Both failure
+    cases return the same generic error, so a client can't distinguish
+    "expired" from "already used" from "never existed".
+    """
+    invalid_token_error = HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token"
+    )
+
+    reset_token = db.scalar(
+        select(PasswordResetToken).where(
+            PasswordResetToken.token_hash == hash_reset_token(payload.token)
+        )
+    )
+    if reset_token is None or reset_token.used_at is not None:
+        raise invalid_token_error
+
+    # SQLite (used in tests) round-trips a `DateTime(timezone=True)`
+    # column as a naive datetime even though Postgres preserves the
+    # timezone — normalize before comparing so this works on both.
+    expires_at = reset_token.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    if expires_at < datetime.now(UTC):
+        raise invalid_token_error
+
+    user = db.get(User, reset_token.user_id)
+    if user is None:
+        # Should be unreachable (the FK constraint guarantees the user
+        # exists), but an assert here would be silently skipped if
+        # Python ever runs with -O, so this defends against that instead.
+        raise invalid_token_error
+
+    user.hashed_password = hash_password(payload.new_password)
+    reset_token.used_at = datetime.now(UTC)
     db.commit()

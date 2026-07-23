@@ -4,6 +4,8 @@ Kept as pure functions (no DB access, no FastAPI dependencies) so the
 crypto logic is trivial to unit test in isolation from the API layer.
 """
 
+import hashlib
+import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -55,3 +57,26 @@ def decode_access_token(token: str) -> UUID | None:
         return UUID(subject)
     except ValueError:
         return None
+
+
+def generate_password_reset_token() -> str:
+    """Generates a high-entropy, URL-safe random token to email to a user
+    requesting a password reset.
+
+    Uses `secrets` (not `random`) because this token is a bearer
+    credential, same trust level as a password — it must be
+    unguessable.
+    """
+    return secrets.token_urlsafe(32)
+
+
+def hash_reset_token(raw_token: str) -> str:
+    """Hashes a reset token for storage.
+
+    Unlike passwords, reset tokens are already high-entropy random
+    strings (not something a human chose), so a fast cryptographic hash
+    (SHA-256) is appropriate here — there's no risk of a dictionary
+    attack the way there is with bcrypt-for-passwords, and a fast hash
+    keeps token lookups cheap.
+    """
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()

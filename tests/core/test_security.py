@@ -9,7 +9,9 @@ from app.core.config import get_settings
 from app.core.security import (
     create_access_token,
     decode_access_token,
+    generate_password_reset_token,
     hash_password,
+    hash_reset_token,
     verify_password,
 )
 
@@ -79,3 +81,33 @@ def test_decode_access_token_returns_none_for_a_token_signed_with_a_different_ke
     )
 
     assert decode_access_token(token_signed_elsewhere) is None
+
+
+def test_generate_password_reset_token_returns_a_high_entropy_string() -> None:
+    token = generate_password_reset_token()
+
+    assert len(token) >= 32
+    # Two calls should never collide in practice.
+    assert token != generate_password_reset_token()
+
+
+def test_hash_reset_token_is_deterministic() -> None:
+    # Unlike bcrypt password hashes, this must be deterministic: we need
+    # to hash the raw token the user submits and look up that exact hash
+    # in the database, so the same input must always hash the same way.
+    token = generate_password_reset_token()
+
+    assert hash_reset_token(token) == hash_reset_token(token)
+
+
+def test_hash_reset_token_differs_for_different_tokens() -> None:
+    first_hash = hash_reset_token(generate_password_reset_token())
+    second_hash = hash_reset_token(generate_password_reset_token())
+
+    assert first_hash != second_hash
+
+
+def test_hash_reset_token_does_not_return_the_raw_token() -> None:
+    token = generate_password_reset_token()
+
+    assert hash_reset_token(token) != token

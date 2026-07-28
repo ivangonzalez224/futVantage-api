@@ -13,7 +13,14 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from app.models.enums import BodyPart, EventCategory, EventResult, EventType, PressureState
+from app.models.enums import (
+    BodyPart,
+    EventCategory,
+    EventResult,
+    EventType,
+    MatchHalf,
+    PressureState,
+)
 
 if TYPE_CHECKING:
     from app.models.match import Match
@@ -47,13 +54,20 @@ class Event(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
     # Normalized 0-100 coordinates (see the frontend's `coordinates.ts`);
-    # independent of the analyst's screen resolution.
+    # independent of the analyst's screen resolution. By the time these
+    # reach the backend, the frontend has already normalized `x_start`/
+    # `x_end` so the tracked team always attacks toward x=100, regardless
+    # of which side of the pitch they were actually on for this `half` —
+    # see `app.domain.event_catalog` and the frontend's
+    # `normalizeAttackingX` for the flip logic.
     x_start: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
     y_start: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
     x_end: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), default=None)
     y_end: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), default=None)
 
     video_timestamp_seconds: Mapped[Decimal] = mapped_column(Numeric(8, 2), nullable=False)
+
+    half: Mapped[MatchHalf] = mapped_column(_enum_type(MatchHalf, "match_half"), nullable=False)
 
     pressure: Mapped[PressureState | None] = mapped_column(
         _enum_type(PressureState, "pressure_state"), default=None

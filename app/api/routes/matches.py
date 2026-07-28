@@ -49,6 +49,7 @@ def create_match(payload: MatchCreate, db: Session = Depends(get_db)) -> Match:
         match_date=payload.match_date,
         video_url=payload.video_url,
         video_duration_seconds=payload.video_duration_seconds,
+        attacking_direction_first_half=payload.attacking_direction_first_half,
     )
     db.add(match)
     db.commit()

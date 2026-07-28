@@ -22,6 +22,7 @@ def _base_payload(**overrides: object) -> dict[str, Any]:
         "x_start": Decimal("30.00"),
         "y_start": Decimal("40.00"),
         "video_timestamp_seconds": Decimal("612.00"),
+        "half": "first_half",
     }
     payload.update(overrides)
     return payload
@@ -32,6 +33,7 @@ def test_accepts_a_valid_event_with_no_destination() -> None:
 
     assert event.type.value == "tackle_duel"
     assert event.x_end is None
+    assert event.half.value == "first_half"
 
 
 def test_accepts_a_pass_like_event_with_destination_and_pressure() -> None:
@@ -91,3 +93,11 @@ def test_rejects_pressure_tag_on_a_type_that_does_not_allow_it() -> None:
 def test_rejects_coordinates_outside_the_0_to_100_range() -> None:
     with pytest.raises(ValidationError):
         EventCreate(**_base_payload(x_start=Decimal("150.00")))
+
+
+def test_rejects_a_missing_half() -> None:
+    payload = _base_payload()
+    del payload["half"]
+
+    with pytest.raises(ValidationError):
+        EventCreate(**payload)

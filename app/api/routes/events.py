@@ -45,6 +45,7 @@ def create_event(match_id: UUID, payload: EventCreate, db: Session = Depends(get
         x_end=payload.x_end,
         y_end=payload.y_end,
         video_timestamp_seconds=payload.video_timestamp_seconds,
+        half=payload.half,
         pressure=payload.pressure,
         body_part=payload.body_part,
     )

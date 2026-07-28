@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models import Academy, Event, Match, Player, Team
-from app.models.enums import EventCategory, EventResult, EventType, PressureState
+from app.models.enums import EventCategory, EventResult, EventType, MatchHalf, PressureState
 
 
 def _build_player(db_session: Session) -> tuple[Player, Match]:
@@ -50,6 +50,7 @@ def test_computes_stats_from_the_players_events(client: TestClient, db_session: 
             x_end=Decimal("50"),
             y_end=Decimal("40"),
             video_timestamp_seconds=Decimal("100"),
+            half=MatchHalf.FIRST_HALF,
             pressure=PressureState.UNDER_PRESSURE,
         ),
         Event(
@@ -64,6 +65,7 @@ def test_computes_stats_from_the_players_events(client: TestClient, db_session: 
             x_end=Decimal("50"),
             y_end=Decimal("40"),
             video_timestamp_seconds=Decimal("200"),
+            half=MatchHalf.FIRST_HALF,
         ),
         Event(
             match=match,
@@ -75,6 +77,7 @@ def test_computes_stats_from_the_players_events(client: TestClient, db_session: 
             x_start=Decimal("85"),
             y_start=Decimal("50"),
             video_timestamp_seconds=Decimal("300"),
+            half=MatchHalf.FIRST_HALF,
         ),
     ]
     db_session.add_all(events)
@@ -113,6 +116,7 @@ def test_scopes_stats_to_a_single_match_when_match_id_is_given(
             x_start=Decimal("30"),
             y_start=Decimal("40"),
             video_timestamp_seconds=Decimal("100"),
+            half=MatchHalf.FIRST_HALF,
         )
     )
     db_session.add(
@@ -126,6 +130,7 @@ def test_scopes_stats_to_a_single_match_when_match_id_is_given(
             x_start=Decimal("30"),
             y_start=Decimal("40"),
             video_timestamp_seconds=Decimal("100"),
+            half=MatchHalf.FIRST_HALF,
         )
     )
     db_session.commit()

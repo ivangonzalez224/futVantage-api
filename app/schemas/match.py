@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from app.models.enums import MatchStatus
+from app.models.enums import AttackDirection, MatchStatus
 
 
 class MatchCreate(BaseModel):
@@ -14,6 +14,7 @@ class MatchCreate(BaseModel):
     match_date: date | None = None
     video_url: str | None = None
     video_duration_seconds: int | None = None
+    attacking_direction_first_half: AttackDirection = AttackDirection.LEFT_TO_RIGHT
 
 
 class MatchRead(BaseModel):
@@ -26,4 +27,5 @@ class MatchRead(BaseModel):
     video_url: str | None
     video_duration_seconds: int | None
     status: MatchStatus
+    attacking_direction_first_half: AttackDirection
     created_at: datetime

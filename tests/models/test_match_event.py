@@ -7,7 +7,14 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.models import Academy, Event, Match, Player, Team
-from app.models.enums import EventCategory, EventResult, EventType, MatchStatus, PressureState
+from app.models.enums import (
+    EventCategory,
+    EventResult,
+    EventType,
+    MatchHalf,
+    MatchStatus,
+    PressureState,
+)
 
 
 def _build_team(db_session: Session) -> Team:
@@ -46,6 +53,7 @@ def test_creates_an_event_with_relationships_and_normalized_coordinates(
         x_end=Decimal("60.25"),
         y_end=Decimal("55.75"),
         video_timestamp_seconds=Decimal("1423.14"),
+        half=MatchHalf.FIRST_HALF,
         pressure=PressureState.UNDER_PRESSURE,
     )
 
@@ -77,6 +85,7 @@ def test_event_without_destination_leaves_x_end_and_y_end_null(db_session: Sessi
         x_start=Decimal("30.00"),
         y_start=Decimal("40.00"),
         video_timestamp_seconds=Decimal("612.00"),
+        half=MatchHalf.FIRST_HALF,
     )
 
     db_session.add(match)
@@ -102,6 +111,7 @@ def test_enum_columns_round_trip_correctly(db_session: Session) -> None:
         x_start=Decimal("88.00"),
         y_start=Decimal("50.00"),
         video_timestamp_seconds=Decimal("2001.50"),
+        half=MatchHalf.SECOND_HALF,
     )
 
     db_session.add(match)
@@ -114,3 +124,4 @@ def test_enum_columns_round_trip_correctly(db_session: Session) -> None:
     assert fetched.category is EventCategory.SHOT
     assert fetched.type is EventType.SHOT_OPEN_PLAY
     assert fetched.result is EventResult.GOAL
+    assert fetched.half is MatchHalf.SECOND_HALF

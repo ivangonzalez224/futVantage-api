@@ -10,7 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from app.models.enums import MatchStatus
+from app.models.enums import AttackDirection, MatchStatus
 
 if TYPE_CHECKING:
     from app.models.event import Event
@@ -19,6 +19,12 @@ if TYPE_CHECKING:
 _match_status_type = SAEnum(
     MatchStatus,
     name="match_status",
+    values_callable=lambda enum_cls: [member.value for member in enum_cls],
+)
+
+_attack_direction_type = SAEnum(
+    AttackDirection,
+    name="attack_direction",
     values_callable=lambda enum_cls: [member.value for member in enum_cls],
 )
 
@@ -33,6 +39,14 @@ class Match(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     video_duration_seconds: Mapped[int | None] = mapped_column(default=None)
     status: Mapped[MatchStatus] = mapped_column(
         _match_status_type, nullable=False, default=MatchStatus.IN_PROGRESS
+    )
+
+    # Which way the tracked team attacks in the first half. The second
+    # half is always the opposite (a rule of football — teams swap
+    # ends at halftime), so we only need to store this once per match;
+    # the frontend derives the second-half direction by flipping it.
+    attacking_direction_first_half: Mapped[AttackDirection] = mapped_column(
+        _attack_direction_type, nullable=False, default=AttackDirection.LEFT_TO_RIGHT
     )
 
     team: Mapped["Team"] = relationship()

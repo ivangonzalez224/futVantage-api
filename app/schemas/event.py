@@ -14,7 +14,14 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.domain.event_catalog import get_event_type_rules
-from app.models.enums import BodyPart, EventCategory, EventResult, EventType, PressureState
+from app.models.enums import (
+    BodyPart,
+    EventCategory,
+    EventResult,
+    EventType,
+    MatchHalf,
+    PressureState,
+)
 
 _COORDINATE_RANGE = Field(ge=Decimal("0"), le=Decimal("100"))
 
@@ -29,6 +36,7 @@ class EventCreate(BaseModel):
     x_end: Decimal | None = Field(default=None, ge=Decimal("0"), le=Decimal("100"))
     y_end: Decimal | None = Field(default=None, ge=Decimal("0"), le=Decimal("100"))
     video_timestamp_seconds: Decimal = Field(ge=Decimal("0"))
+    half: MatchHalf
     pressure: PressureState | None = None
     body_part: BodyPart | None = None
 
@@ -73,6 +81,7 @@ class EventRead(BaseModel):
     x_end: Decimal | None
     y_end: Decimal | None
     video_timestamp_seconds: Decimal
+    half: MatchHalf
     pressure: PressureState | None
     body_part: BodyPart | None
     created_at: datetime

@@ -32,6 +32,7 @@ def test_creates_an_event_without_destination(client: TestClient, db_session: Se
             "x_start": "30.00",
             "y_start": "40.00",
             "video_timestamp_seconds": "612.00",
+            "half": "first_half",
         },
     )
 
@@ -40,6 +41,7 @@ def test_creates_an_event_without_destination(client: TestClient, db_session: Se
     assert body["type"] == "tackle_duel"
     assert body["category"] == "duel"
     assert body["x_end"] is None
+    assert body["half"] == "first_half"
 
 
 def test_creates_a_pass_event_with_destination(client: TestClient, db_session: Session) -> None:
@@ -57,6 +59,7 @@ def test_creates_a_pass_event_with_destination(client: TestClient, db_session: S
             "x_end": "60.25",
             "y_end": "55.75",
             "video_timestamp_seconds": "1423.14",
+            "half": "second_half",
             "pressure": "under_pressure",
         },
     )
@@ -66,6 +69,7 @@ def test_creates_a_pass_event_with_destination(client: TestClient, db_session: S
     assert body["category"] == "pass"
     assert body["x_end"] == "60.25"
     assert body["pressure"] == "under_pressure"
+    assert body["half"] == "second_half"
 
 
 def test_rejects_a_pass_event_missing_the_destination(
@@ -83,6 +87,26 @@ def test_rejects_a_pass_event_missing_the_destination(
             "x_start": "45.50",
             "y_start": "50.00",
             "video_timestamp_seconds": "1423.14",
+            "half": "first_half",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_rejects_an_event_missing_the_half(client: TestClient, db_session: Session) -> None:
+    match, player = _build_match_with_player(db_session)
+
+    response = client.post(
+        f"/api/v1/matches/{match.id}/events",
+        json={
+            "team_id": str(player.team_id),
+            "player_id": str(player.id),
+            "type": "tackle_duel",
+            "result": "won",
+            "x_start": "30.00",
+            "y_start": "40.00",
+            "video_timestamp_seconds": "612.00",
         },
     )
 
@@ -105,6 +129,7 @@ def test_returns_404_when_creating_an_event_for_a_missing_match(
             "x_start": "30.00",
             "y_start": "40.00",
             "video_timestamp_seconds": "612.00",
+            "half": "first_half",
         },
     )
 
@@ -127,6 +152,7 @@ def test_lists_events_for_a_match_ordered_by_timestamp(
                 "x_start": "30.00",
                 "y_start": "40.00",
                 "video_timestamp_seconds": timestamp,
+                "half": "first_half",
             },
         )
 

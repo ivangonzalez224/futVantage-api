@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models import Academy, Event, Match, Player, Team
-from app.models.enums import EventCategory, EventResult, EventType, PressureState
+from app.models.enums import EventCategory, EventResult, EventType, MatchHalf, PressureState
 
 
 def _build_match(db_session: Session) -> tuple[Match, Player]:
@@ -55,6 +55,7 @@ def test_aggregates_team_totals_set_pieces_and_loss_zones(
             x_end=Decimal("55"),
             y_end=Decimal("20"),
             video_timestamp_seconds=Decimal("100"),
+            half=MatchHalf.FIRST_HALF,
             pressure=PressureState.UNDER_PRESSURE,
         ),
         Event(
@@ -67,6 +68,7 @@ def test_aggregates_team_totals_set_pieces_and_loss_zones(
             x_start=Decimal("89"),
             y_start=Decimal("50"),
             video_timestamp_seconds=Decimal("200"),
+            half=MatchHalf.FIRST_HALF,
             body_part="right_foot",
         ),
     ]

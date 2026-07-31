@@ -1,4 +1,6 @@
-"""Endpoints for reading a team's player roster and individual stats."""
+"""Endpoints for reading, creating, and updating a team's player roster,
+plus individual player stats.
+"""
 
 from uuid import UUID
 
@@ -11,7 +13,7 @@ from app.domain.player_stats import compute_player_stats
 from app.models.event import Event
 from app.models.player import Player
 from app.models.team import Team
-from app.schemas.player import PlayerRead
+from app.schemas.player import PlayerCreate, PlayerRead, PlayerUpdate
 from app.schemas.player_stats import (
     DefensiveStatsRead,
     DuelStatsRead,
@@ -37,6 +39,84 @@ def list_team_players(team_id: UUID, db: Session = Depends(get_db)) -> list[Play
 
     statement = select(Player).where(Player.team_id == team_id).order_by(Player.jersey_number)
     return list(db.scalars(statement))
+
+
+@router.post(
+    "/teams/{team_id}/players", response_model=PlayerRead, status_code=status.HTTP_201_CREATED
+)
+def create_player(team_id: UUID, payload: PlayerCreate, db: Session = Depends(get_db)) -> Player:
+    """Adds a player to a team's roster.
+
+    Jersey numbers are unique within a team; reusing one already taken
+    on this team returns 409, not a generic validation error.
+    """
+    team = db.get(Team, team_id)
+    if team is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
+
+    existing_player = db.scalar(
+        select(Player).where(
+            Player.team_id == team_id, Player.jersey_number == payload.jersey_number
+        )
+    )
+    if existing_player is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Jersey number {payload.jersey_number} is already taken on this team",
+        )
+
+    player = Player(
+        team_id=team_id,
+        jersey_number=payload.jersey_number,
+        full_name=payload.full_name,
+        position=payload.position,
+        birth_date=payload.birth_date,
+    )
+    db.add(player)
+    db.commit()
+    db.refresh(player)
+
+    return player
+
+
+@router.patch("/players/{player_id}", response_model=PlayerRead)
+def update_player(player_id: UUID, payload: PlayerUpdate, db: Session = Depends(get_db)) -> Player:
+    """Updates a player's roster info.
+
+    Only the fields actually sent in the request body are changed.
+    Changing to a jersey number another player on the same team already
+    has returns 409, same as creation.
+    """
+    player = db.get(Player, player_id)
+    if player is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Player not found")
+
+    if payload.jersey_number is not None and payload.jersey_number != player.jersey_number:
+        existing_player = db.scalar(
+            select(Player).where(
+                Player.team_id == player.team_id,
+                Player.jersey_number == payload.jersey_number,
+                Player.id != player_id,
+            )
+        )
+        if existing_player is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Jersey number {payload.jersey_number} is already taken on this team",
+            )
+        player.jersey_number = payload.jersey_number
+
+    if payload.full_name is not None:
+        player.full_name = payload.full_name
+    if payload.position is not None:
+        player.position = payload.position
+    if payload.birth_date is not None:
+        player.birth_date = payload.birth_date
+
+    db.commit()
+    db.refresh(player)
+
+    return player
 
 
 @router.get("/players/{player_id}/stats", response_model=PlayerStatsRead)

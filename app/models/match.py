@@ -14,6 +14,7 @@ from app.models.enums import AttackDirection, MatchStatus
 
 if TYPE_CHECKING:
     from app.models.event import Event
+    from app.models.match_possession import MatchPossession
     from app.models.team import Team
 
 _match_status_type = SAEnum(
@@ -49,8 +50,17 @@ class Match(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         _attack_direction_type, nullable=False, default=AttackDirection.LEFT_TO_RIGHT
     )
 
+    # Once true, the possession control on /annotate becomes read-only
+    # — lets an analyst do a dedicated possession-tracking pass through
+    # the video, then "seal" it before switching to a separate pass for
+    # event annotation, without accidentally nudging the numbers.
+    possession_tracking_locked: Mapped[bool] = mapped_column(nullable=False, default=False)
+
     team: Mapped["Team"] = relationship()
     events: Mapped[list["Event"]] = relationship(back_populates="match")
+    possession_records: Mapped[list["MatchPossession"]] = relationship(
+        back_populates="match", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return (

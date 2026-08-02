@@ -17,6 +17,19 @@ class MatchCreate(BaseModel):
     attacking_direction_first_half: AttackDirection = AttackDirection.LEFT_TO_RIGHT
 
 
+class MatchUpdate(BaseModel):
+    """Every field is optional: only the ones actually sent get updated
+    — for now this is used to attach or replace a match's video URL
+    after the match was already created, but the shape allows updating
+    any of these fields later without a separate schema.
+    """
+
+    opponent_name: str | None = None
+    match_date: date | None = None
+    video_url: str | None = None
+    video_duration_seconds: int | None = None
+
+
 class MatchRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

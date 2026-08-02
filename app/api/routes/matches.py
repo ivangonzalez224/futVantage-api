@@ -13,7 +13,7 @@ from app.domain.match_report import compute_match_report
 from app.models.event import Event
 from app.models.match import Match
 from app.models.team import Team
-from app.schemas.match import MatchCreate, MatchRead
+from app.schemas.match import MatchCreate, MatchRead, MatchUpdate
 from app.schemas.match_report import (
     AttackFlowRead,
     MatchReportRead,
@@ -109,3 +109,27 @@ def get_match_report(match_id: UUID, db: Session = Depends(get_db)) -> MatchRepo
             PossessionLossPointRead.model_validate(point) for point in report.possession_loss_zones
         ],
     )
+
+
+@router.patch("/matches/{match_id}", response_model=MatchRead)
+def update_match(match_id: UUID, payload: MatchUpdate, db: Session = Depends(get_db)) -> Match:
+    """Updates a match's editable fields — today, mainly used to attach
+    or replace its video URL after the match was already created.
+
+    Sending `video_url: null` explicitly clears it (unlike `PATCH
+    /players/{id}`, where omitting a field is what leaves it
+    untouched — here, sending the field with a null value is itself
+    a meaningful action: "remove the video").
+    """
+    match = db.get(Match, match_id)
+    if match is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Match not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(match, field, value)
+
+    db.commit()
+    db.refresh(match)
+
+    return match
